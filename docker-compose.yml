@@ -1,0 +1,71 @@
+services:
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    env_file:
+      - .env 
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data  # Agregar persistencia de datos si es necesario
+
+  celery:
+    build: .
+    command: celery -A lottery_app worker --loglevel=info
+    volumes:
+      - .:/app
+    depends_on:
+      - web
+      - redis
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0      
+    env_file:
+      - .env 
+    # user: "1000:1000"
+
+  redis-commander:
+    image: rediscommander/redis-commander
+    ports:
+      - "8084:8081"  # Puerto para acceder a Redis Commander
+    environment:
+      - REDIS_HOST=redis  # Nombre del servicio Redis
+      - REDIS_PORT=6379  # Puerto de Redis
+    depends_on:
+      - redis
+
+  frontend:
+    build:
+      context: ./frontend-app  # Ruta donde está tu Dockerfile de Vue.js
+    ports:
+      - "8080:80"  # Puerto para acceder a la aplicación Vue.js
+    volumes:
+      - ./frontend:/app  # Para habilitar live reload si es necesario
+      - ./src:/app/src  # Montar la carpeta src
+      - ./public:/app/public  # Montar la carpeta public
+    depends_on:
+      - web  # El frontend espera a que el backend esté listo
+
+  nginx:
+    image: nginx:alpine  # Utilizar la imagen de Nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf  # Montar tu archivo de configuración de Nginx
+    ports:
+      - "80:80"  # Exponer el puerto 80 para acceder a Nginx
+    depends_on:
+      - web  # Asegúrate de que el contenedor web esté listo
+
+
+volumes:
+  redis_data:  # Definir el volumen para Redis

@@ -1,0 +1,3 @@
+# Archivos sensibles
+.env
+credentials.json
